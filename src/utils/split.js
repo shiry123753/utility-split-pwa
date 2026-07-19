@@ -45,9 +45,11 @@ export function splitMonth(monthId, fees = {}, paidBy = {}) {
 // 淨額結算：只計「未結清（settled=false）」的費用，把每組成員配對的
 // 雙向欠款加總後互相抵銷，回傳最終淨額與算式所需的兩個方向小計。
 // 小計先各自四捨五入到整數再相減，讓畫面上的算式數字對得起來。
-// 回傳 [{ from, to, net, fromOwes, toOwes }]（from → to 匯 net 元）
+// 回傳 [{ from, to, net, fromOwes, toOwes, fromItems, toItems }]
+//（from → to 匯 net 元；fromItems/toItems = 兩個方向各由哪些費用項目組成）
 export function netSettlement(months) {
   const owe = {} // 'aId>bId' → a 應付 b 的累計金額
+  const oweItems = {} // 'aId>bId' → 組成該方向欠款的費用項目名稱集合
   for (const mo of months) {
     const active = MEMBERS.filter((m) => mo.id >= m.from)
     for (const fee of FEES) {
@@ -61,10 +63,16 @@ export function netSettlement(months) {
       const each = amt / splitters.length
       for (const m of splitters) {
         if (m.id === payer.id) continue
-        owe[`${m.id}>${payer.id}`] = (owe[`${m.id}>${payer.id}`] || 0) + each
+        const key = `${m.id}>${payer.id}`
+        owe[key] = (owe[key] || 0) + each
+        ;(oweItems[key] ||= new Set()).add(fee.label)
       }
     }
   }
+
+  // 項目名稱依 FEES 定義順序排列（水費、電費、瓦斯費、網路費、管理費）
+  const sortItems = (set) =>
+    FEES.map((f) => f.label).filter((label) => set?.has(label))
 
   const pairs = []
   for (let i = 0; i < MEMBERS.length; i++) {
@@ -82,6 +90,8 @@ export function netSettlement(months) {
         net: Math.abs(net),
         fromOwes: Math.max(aToB, bToA), // 淨欠方原本應付的小計
         toOwes: Math.min(aToB, bToA), // 對方應付的小計（被抵銷掉的部分）
+        fromItems: sortItems(oweItems[`${from.id}>${to.id}`]),
+        toItems: sortItems(oweItems[`${to.id}>${from.id}`]),
       })
     }
   }

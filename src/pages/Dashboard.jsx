@@ -224,9 +224,15 @@ function NetBlock({ months, title }) {
             <b className="serif net-amt">$ {fmt(p.net)}</b>
           </div>
           <p className="net-formula">
-            {p.toOwes > 0
-              ? `${p.from.name}應付${p.to.name} $${fmt(p.fromOwes)} − ${p.to.name}應付${p.from.name} $${fmt(p.toOwes)} = $${fmt(p.net)}`
-              : `${p.from.name}應付${p.to.name} $${fmt(p.fromOwes)}（無互欠可抵銷）`}
+            {p.from.name}應付{p.to.name} ${fmt(p.fromOwes)}
+            <span className="net-items">{p.fromItems.join('・')}</span>
+            {p.toOwes > 0 && (
+              <>
+                {' − '}{p.to.name}應付{p.from.name} ${fmt(p.toOwes)}
+                <span className="net-items">{p.toItems.join('・')}</span>
+                {' = '}${fmt(p.net)}
+              </>
+            )}
           </p>
         </div>
       ))}

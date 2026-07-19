@@ -180,6 +180,7 @@ input:disabled { background: var(--panel2); color: var(--mut); }
 .net-arrow { color: var(--acc); font-weight: 400; margin: 0 2px; }
 .net-amt { font-size: 19px; }
 .net-formula { font-size: 11.5px; color: var(--mut); margin-top: 2px; }
+.net-items { font-size: 10px; color: var(--acc); margin: 0 3px; letter-spacing: .5px; }
 
 /* ---- 全部歷史檢視 ---- */
 .history-hint { margin: 0 2px 12px; }
