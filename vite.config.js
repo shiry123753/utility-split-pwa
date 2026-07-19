@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // 水電專案固定用 5176 埠，避免跟桌面其他專案（韓國/記帳/打卡）搶埠號
+  server: { port: 5176 },
   plugins: [
     react(),
     VitePWA({
