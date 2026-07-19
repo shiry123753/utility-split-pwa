@@ -4,7 +4,7 @@ import { doc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db, COL } from '../firebase/config'
 import { useMonths } from '../hooks/useMonths'
 import { MEMBERS, DEFAULT_PAID_BY, SEED_MONTHS, seedSettled } from '../data/constants'
-import { splitMonth, monthTotal, fmt, monthLabel } from '../utils/split'
+import { splitMonth, monthTotal, fmt, monthLabel, netSettlement } from '../utils/split'
 
 // 點擊切換某筆費用的結清狀態（demo 模式不寫入）
 async function toggleSettled(monthId, feeKey, cur, demo) {
@@ -204,10 +204,38 @@ function MonthView({ months, selected, setSelected, demo }) {
   )
 }
 
+// ── 淨額結算:成員配對互抵未結清往來，只看最終誰匯給誰 ──────────
+function NetBlock({ months }) {
+  const pairs = netSettlement(months)
+  if (pairs.length === 0) return null
+  return (
+    <section className="card net-block">
+      <p className="kicker">NET · 淨額結算（僅計未結清）</p>
+      {pairs.map((p) => (
+        <div key={`${p.from.id}-${p.to.id}`} className="net-row">
+          <div className="net-main">
+            <span className="net-dir">
+              {p.from.name} <span className="net-arrow">→</span> {p.to.name}
+            </span>
+            <b className="serif net-amt">$ {fmt(p.net)}</b>
+          </div>
+          <p className="net-formula">
+            {p.toOwes > 0
+              ? `${p.from.name}應付${p.to.name} $${fmt(p.fromOwes)} − ${p.to.name}應付${p.from.name} $${fmt(p.toOwes)} = $${fmt(p.net)}`
+              : `${p.from.name}應付${p.to.name} $${fmt(p.fromOwes)}（無互欠可抵銷）`}
+          </p>
+        </div>
+      ))}
+      <p className="hint">※ 把某筆費用標成已結清後，這裡會即時重算。</p>
+    </section>
+  )
+}
+
 // ── 全部歷史檢視:所有月份逐筆列出，方便對帳 ─────────────────────
 function HistoryView({ months, openMonth, demo }) {
   return (
     <>
+      <NetBlock months={months} />
       <p className="hint history-hint">
         2025.3 起的完整紀錄，每筆含金額、收款人、分攤人數與每人應付；紅字＝還沒收齊。
         點月份可跳到單月檢視、點標籤可切換結清狀態。

@@ -42,6 +42,52 @@ export function splitMonth(monthId, fees = {}, paidBy = {}) {
   return { members, details }
 }
 
+// 淨額結算：只計「未結清（settled=false）」的費用，把每組成員配對的
+// 雙向欠款加總後互相抵銷，回傳最終淨額與算式所需的兩個方向小計。
+// 小計先各自四捨五入到整數再相減，讓畫面上的算式數字對得起來。
+// 回傳 [{ from, to, net, fromOwes, toOwes }]（from → to 匯 net 元）
+export function netSettlement(months) {
+  const owe = {} // 'aId>bId' → a 應付 b 的累計金額
+  for (const mo of months) {
+    const active = MEMBERS.filter((m) => mo.id >= m.from)
+    for (const fee of FEES) {
+      const amt = Number(mo.fees[fee.key]) || 0
+      if (amt <= 0 || mo.settled?.[fee.key]) continue
+      const payerName = mo.paidBy?.[fee.key] || DEFAULT_PAID_BY[fee.key]
+      const payer = MEMBERS.find((m) => m.name === payerName)
+      if (!payer) continue
+      const splitters = active.filter((m) => m.groups.includes(fee.group))
+      if (splitters.length === 0) continue
+      const each = amt / splitters.length
+      for (const m of splitters) {
+        if (m.id === payer.id) continue
+        owe[`${m.id}>${payer.id}`] = (owe[`${m.id}>${payer.id}`] || 0) + each
+      }
+    }
+  }
+
+  const pairs = []
+  for (let i = 0; i < MEMBERS.length; i++) {
+    for (let j = i + 1; j < MEMBERS.length; j++) {
+      const a = MEMBERS[i]
+      const b = MEMBERS[j]
+      const aToB = Math.round(owe[`${a.id}>${b.id}`] || 0)
+      const bToA = Math.round(owe[`${b.id}>${a.id}`] || 0)
+      if (aToB === 0 && bToA === 0) continue
+      const net = aToB - bToA // 負值代表方向相反
+      const [from, to] = net >= 0 ? [a, b] : [b, a]
+      pairs.push({
+        from,
+        to,
+        net: Math.abs(net),
+        fromOwes: Math.max(aToB, bToA), // 淨欠方原本應付的小計
+        toOwes: Math.min(aToB, bToA), // 對方應付的小計（被抵銷掉的部分）
+      })
+    }
+  }
+  return pairs.sort((x, y) => y.net - x.net)
+}
+
 // 該月費用總額
 export function monthTotal(fees = {}) {
   return FEES.reduce((sum, f) => sum + (Number(fees[f.key]) || 0), 0)
