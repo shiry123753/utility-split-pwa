@@ -1,29 +1,45 @@
-import { FEES, MEMBERS } from '../data/constants'
+import { FEES, MEMBERS, DEFAULT_PAID_BY } from '../data/constants'
 
-// 計算某個月份每位成員的分攤結果。
-// 回傳 { [memberId]: { share, net } }：
-//   share = 該月應分攤總額（各費用 ÷ 該費用當月分攤人數）
-//   net   = 實際應付金額；賴覺生因已自付管理費，net = share − 管理費
-//           （net 為負代表其他人收齊後應把錢還給他）
-export function splitMonth(monthId, fees = {}) {
+// 計算某個月份的分攤結果。
+// 回傳 {
+//   members: { [id]: { share, toPay, receivable, net } }
+//     share      = 該月應分攤總額
+//     toPay      = { 先墊付者姓名: 應匯金額 }（明確標出這筆錢要匯給誰）
+//     receivable = 自己先墊付的費用中，其他人應還給自己的部分
+//     net        = toPay 總和 − receivable（負值代表收回的比要付的多）
+//   details: [{ key, label, amount, payer, n, each }]  → 供歷史檢視逐筆列出
+// }
+export function splitMonth(monthId, fees = {}, paidBy = {}) {
   const active = MEMBERS.filter((m) => monthId >= m.from)
-  const result = {}
-  for (const m of active) result[m.id] = { share: 0, net: 0 }
+  const members = {}
+  for (const m of active) members[m.id] = { share: 0, toPay: {}, receivable: 0, net: 0 }
+  const details = []
 
   for (const fee of FEES) {
     const amt = Number(fees[fee.key]) || 0
     if (amt <= 0) continue
-    const payers = active.filter((m) => m.groups.includes(fee.group))
-    if (payers.length === 0) continue
-    const each = amt / payers.length
-    for (const m of payers) result[m.id].share += each
+    const splitters = active.filter((m) => m.groups.includes(fee.group))
+    if (splitters.length === 0) continue
+    const payer = paidBy[fee.key] || DEFAULT_PAID_BY[fee.key]
+    const each = amt / splitters.length
+    details.push({ key: fee.key, label: fee.label, amount: amt, payer, n: splitters.length, each })
+
+    for (const m of splitters) {
+      members[m.id].share += each
+      if (m.name === payer) {
+        // 自己先墊了整筆，其他人的份之後要還他
+        members[m.id].receivable += amt - each
+      } else {
+        members[m.id].toPay[payer] = (members[m.id].toPay[payer] || 0) + each
+      }
+    }
   }
 
-  for (const m of active) {
-    const prepaid = m.prepaysMgmt ? Number(fees.mgmt) || 0 : 0
-    result[m.id].net = result[m.id].share - prepaid
+  for (const id in members) {
+    const v = members[id]
+    v.net = Object.values(v.toPay).reduce((a, b) => a + b, 0) - v.receivable
   }
-  return result
+  return { members, details }
 }
 
 // 該月費用總額
@@ -34,4 +50,10 @@ export function monthTotal(fees = {}) {
 // 金額顯示：四捨五入到整數 + 千分位
 export function fmt(n) {
   return Math.round(Math.abs(n)).toLocaleString('zh-TW')
+}
+
+// 月份顯示：2026-07 → 2026.7
+export function monthLabel(id) {
+  const [y, m] = id.split('-')
+  return `${y}.${Number(m)}`
 }

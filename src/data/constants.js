@@ -17,6 +17,16 @@ export const FEES = [
   { key: 'mgmt', label: '管理費', group: 'base3' },
 ]
 
+// 每筆費用預設的先墊付者（= 這筆錢要匯給誰）。
+// Firestore 文件的 paidBy 欄位若缺漏（舊資料），一律以此為準。
+export const DEFAULT_PAID_BY = {
+  water: '陳億',
+  electricity: '陳億',
+  gas: '陳億',
+  internet: '陳億',
+  mgmt: '賴覺生',
+}
+
 export const MEMBERS = [
   { id: 'jue', name: '賴覺生', from: '2025-03', groups: ['base3', 'utility'], prepaysMgmt: true },
   { id: 'chi', name: '陳麒伊', from: '2025-03', groups: ['base3', 'utility'] },

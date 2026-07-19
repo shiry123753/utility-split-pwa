@@ -1,13 +1,9 @@
 import { useMonths } from '../hooks/useMonths'
 import { MEMBERS } from '../data/constants'
-import { splitMonth, fmt } from '../utils/split'
+import { splitMonth, fmt, monthLabel } from '../utils/split'
 
-function monthLabel(id) {
-  const [y, m] = id.split('-')
-  return `${y}.${Number(m)}`
-}
-
-// 個人結算：每位成員跨月累計應付 / 已收 / 未收
+// 個人結算：每位成員跨月累計應付 / 已結清 / 未結清，
+// 未結清部分並列出要匯給誰、各多少。
 export default function Settlement() {
   const { months, loading } = useMonths()
   if (loading) return <p className="hint">載入中…</p>
@@ -16,16 +12,25 @@ export default function Settlement() {
   const stats = MEMBERS.map((m) => {
     let total = 0
     let collected = 0
+    const unpaidToPay = {} // 未結清月份累計:要匯給誰各多少
+    let unpaidReceivable = 0
     const unpaidMonths = []
     for (const mo of months) {
       if (mo.id < m.from) continue
-      const { net } = splitMonth(mo.id, mo.fees)[m.id]
-      if (Math.abs(net) < 0.5) continue
+      const { toPay, receivable, net } = splitMonth(mo.id, mo.fees, mo.paidBy).members[m.id]
+      if (Math.abs(net) < 0.5 && receivable < 0.5) continue
       total += net
-      if (mo.paid[m.id]) collected += net
-      else unpaidMonths.push(mo.id)
+      if (mo.paid[m.id]) {
+        collected += net
+      } else {
+        unpaidMonths.push(mo.id)
+        for (const [payee, amt] of Object.entries(toPay)) {
+          unpaidToPay[payee] = (unpaidToPay[payee] || 0) + amt
+        }
+        unpaidReceivable += receivable
+      }
     }
-    return { ...m, total, collected, outstanding: total - collected, unpaidMonths }
+    return { ...m, total, collected, outstanding: total - collected, unpaidToPay, unpaidReceivable, unpaidMonths }
   })
 
   return (
@@ -41,7 +46,7 @@ export default function Settlement() {
             <div>
               <p className="kicker">累計應付</p>
               <p className={`serif stat${s.total < -0.5 ? ' owed' : ''}`}>
-                {s.total < -0.5 ? `應退 $ ${fmt(s.total)}` : `$ ${fmt(s.total)}`}
+                {s.total < -0.5 ? `應收 $ ${fmt(s.total)}` : `$ ${fmt(s.total)}`}
               </p>
             </div>
             <div>
@@ -51,10 +56,24 @@ export default function Settlement() {
             <div>
               <p className="kicker">未結清</p>
               <p className={`serif stat${Math.abs(s.outstanding) > 0.5 ? ' bad' : ''}`}>
-                {s.outstanding < -0.5 ? `應退 $ ${fmt(s.outstanding)}` : `$ ${fmt(s.outstanding)}`}
+                {s.outstanding < -0.5 ? `應收 $ ${fmt(s.outstanding)}` : `$ ${fmt(s.outstanding)}`}
               </p>
             </div>
           </div>
+          {(Object.keys(s.unpaidToPay).length > 0 || s.unpaidReceivable > 0.5) && (
+            <div className="member-transfers settle-transfers">
+              {Object.entries(s.unpaidToPay).map(([payee, amt]) => (
+                <span key={payee} className="transfer">
+                  匯給 {payee} <b className="serif">$ {fmt(amt)}</b>
+                </span>
+              ))}
+              {s.unpaidReceivable > 0.5 && (
+                <span className="transfer in">
+                  收回代墊 <b className="serif">$ {fmt(s.unpaidReceivable)}</b>
+                </span>
+              )}
+            </div>
+          )}
           {s.unpaidMonths.length > 0 && (
             <p className="hint unpaid-list">
               未結清月份：{s.unpaidMonths.slice().reverse().map(monthLabel).join('、')}
@@ -63,7 +82,8 @@ export default function Settlement() {
         </section>
       ))}
       <p className="hint">
-        ※ 賴覺生每月自付管理費 5,818 元，其應付金額已扣除代墊款；「應退」代表收齊後須退還給他。
+        ※ 水電瓦斯網路由陳億先繳、管理費由賴覺生先繳；「匯給誰」即該筆錢的先墊付者。
+        賴覺生的「收回代墊」= 其他人應還他的管理費份額。
       </p>
     </>
   )

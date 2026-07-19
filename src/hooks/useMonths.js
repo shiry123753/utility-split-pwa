@@ -1,19 +1,36 @@
 import { useEffect, useState } from 'react'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db, COL } from '../firebase/config'
+import { SEED_MONTHS } from '../data/constants'
 
 // 即時訂閱所有月份資料，依月份新→舊排序。
-// 回傳 { months: [{ id, fees, paid }], loading }
+// 回傳 { months: [{ id, fees, paid, paidBy }], loading }
+// 網址帶 ?demo 時改用內建歷史資料（不連 Firestore），方便還沒開規則前先預覽。
 export function useMonths() {
+  const demo = new URLSearchParams(window.location.search).has('demo')
   const [months, setMonths] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (demo) {
+      setMonths(
+        Object.entries(SEED_MONTHS)
+          .map(([id, fees]) => ({ id, fees, paid: {}, paidBy: {} }))
+          .sort((a, b) => b.id.localeCompare(a.id))
+      )
+      setLoading(false)
+      return
+    }
     const unsub = onSnapshot(
       collection(db, COL.months),
       (snap) => {
         const list = snap.docs
-          .map((d) => ({ id: d.id, fees: d.data().fees || {}, paid: d.data().paid || {} }))
+          .map((d) => ({
+            id: d.id,
+            fees: d.data().fees || {},
+            paid: d.data().paid || {},
+            paidBy: d.data().paidBy || {},
+          }))
           .sort((a, b) => b.id.localeCompare(a.id))
         setMonths(list)
         setLoading(false)
@@ -24,7 +41,7 @@ export function useMonths() {
       }
     )
     return unsub
-  }, [])
+  }, [demo])
 
-  return { months, loading }
+  return { months, loading, demo }
 }

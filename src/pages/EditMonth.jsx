@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { doc, setDoc, deleteDoc } from 'firebase/firestore'
 import { db, COL } from '../firebase/config'
 import { useMonths } from '../hooks/useMonths'
-import { FEES, MGMT_FEE } from '../data/constants'
+import { FEES, MGMT_FEE, DEFAULT_PAID_BY } from '../data/constants'
 
 // 沒帶月份參數時（新增模式），預設帶出「最新月份的下一個月」
 function nextMonth(id) {
@@ -39,13 +39,17 @@ export default function EditMonth() {
   const save = async () => {
     if (!month) return alert('請選擇月份')
     const fees = {}
+    const paidBy = {}
     for (const f of FEES) {
       const n = Number(form[f.key])
-      if (n > 0) fees[f.key] = n
+      if (n > 0) {
+        fees[f.key] = n
+        paidBy[f.key] = DEFAULT_PAID_BY[f.key] // 記錄這筆錢是誰先墊的
+      }
     }
     setSaving(true)
     try {
-      await setDoc(doc(db, COL.months, month), { fees }, { merge: true })
+      await setDoc(doc(db, COL.months, month), { fees, paidBy }, { merge: true })
       navigate('/')
     } catch (e) {
       console.error(e)
@@ -78,7 +82,9 @@ export default function EditMonth() {
 
       {FEES.map((f) => (
         <label key={f.key} className="field">
-          <span className="kicker">{f.label}</span>
+          <span className="kicker">
+            {f.label}<span className="payer-chip">{DEFAULT_PAID_BY[f.key]}先繳</span>
+          </span>
           <input
             type="number"
             inputMode="numeric"
