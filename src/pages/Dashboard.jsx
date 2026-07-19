@@ -168,6 +168,9 @@ function MonthView({ months, selected, setSelected, demo }) {
         </div>
       </section>
 
+      {/* 本月淨額結算：當月配對互抵後的最終匯款 */}
+      <NetBlock months={[current]} title="NET · 本月淨額結算（僅計未結清）" />
+
       {/* 每人應付：明確列出要匯給誰 */}
       <p className="kicker section-label">SPLIT · 每人應付</p>
       {activeMembers.map((m) => {
@@ -205,12 +208,13 @@ function MonthView({ months, selected, setSelected, demo }) {
 }
 
 // ── 淨額結算:成員配對互抵未結清往來，只看最終誰匯給誰 ──────────
-function NetBlock({ months }) {
+// 單月檢視傳當月一個月、全部歷史傳所有月份，計算共用同一套 netSettlement。
+function NetBlock({ months, title }) {
   const pairs = netSettlement(months)
   if (pairs.length === 0) return null
   return (
     <section className="card net-block">
-      <p className="kicker">NET · 淨額結算（僅計未結清）</p>
+      <p className="kicker">{title}</p>
       {pairs.map((p) => (
         <div key={`${p.from.id}-${p.to.id}`} className="net-row">
           <div className="net-main">
@@ -235,7 +239,7 @@ function NetBlock({ months }) {
 function HistoryView({ months, openMonth, demo }) {
   return (
     <>
-      <NetBlock months={months} />
+      <NetBlock months={months} title="NET · 淨額結算（全部未結清）" />
       <p className="hint history-hint">
         2025.3 起的完整紀錄，每筆含金額、收款人、分攤人數與每人應付；紅字＝還沒收齊。
         點月份可跳到單月檢視、點標籤可切換結清狀態。
