@@ -23,9 +23,10 @@ export default function EditMonth() {
   if (loading) return <p className="hint">載入中…</p>
 
   const isEdit = !!monthId
-  const existing = isEdit ? months.find((m) => m.id === monthId) : null
   const defaultMonth = monthId || (months[0] ? nextMonth(months[0].id) : '2026-08')
   const month = monthInput || defaultMonth
+  // 依實際要儲存的月份查既有資料，新增模式選到已存在的月份時才不會蓋掉 paid/settled
+  const existing = months.find((m) => m.id === month) || null
 
   // 表單初值：編輯帶原值；新增預設帶固定管理費
   const initial = {}
@@ -40,16 +41,19 @@ export default function EditMonth() {
     if (!month) return alert('請選擇月份')
     const fees = {}
     const paidBy = {}
+    const settled = {}
     for (const f of FEES) {
       const n = Number(form[f.key])
       if (n > 0) {
         fees[f.key] = n
-        paidBy[f.key] = DEFAULT_PAID_BY[f.key] // 記錄這筆錢是誰先墊的
+        paidBy[f.key] = DEFAULT_PAID_BY[f.key] // 記錄這筆錢的收款人
+        settled[f.key] = existing?.settled?.[f.key] ?? false // 新費用預設未結清
       }
     }
     setSaving(true)
     try {
-      await setDoc(doc(db, COL.months, month), { fees, paidBy }, { merge: true })
+      // 整份覆寫（保留 paid），清空的費用才會真的被移除
+      await setDoc(doc(db, COL.months, month), { fees, paidBy, settled, paid: existing?.paid || {} })
       navigate('/')
     } catch (e) {
       console.error(e)
@@ -83,7 +87,7 @@ export default function EditMonth() {
       {FEES.map((f) => (
         <label key={f.key} className="field">
           <span className="kicker">
-            {f.label}<span className="payer-chip">{DEFAULT_PAID_BY[f.key]}先繳</span>
+            {f.label}<span className="payer-chip">{DEFAULT_PAID_BY[f.key]}收款</span>
           </span>
           <input
             type="number"

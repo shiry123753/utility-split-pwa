@@ -3,8 +3,27 @@ import { Link } from 'react-router-dom'
 import { doc, updateDoc, writeBatch } from 'firebase/firestore'
 import { db, COL } from '../firebase/config'
 import { useMonths } from '../hooks/useMonths'
-import { MEMBERS, DEFAULT_PAID_BY, SEED_MONTHS } from '../data/constants'
+import { MEMBERS, DEFAULT_PAID_BY, SEED_MONTHS, seedSettled } from '../data/constants'
 import { splitMonth, monthTotal, fmt, monthLabel } from '../utils/split'
+
+// 點擊切換某筆費用的結清狀態（demo 模式不寫入）
+async function toggleSettled(monthId, feeKey, cur, demo) {
+  if (demo) return
+  await updateDoc(doc(db, COL.months, monthId), { [`settled.${feeKey}`]: !cur })
+}
+
+// 未結清 / 已結清 標籤（可點擊切換）
+function SettledChip({ mo, feeKey, demo }) {
+  const on = !!mo.settled[feeKey]
+  return (
+    <button
+      className={`settled-chip${on ? ' on' : ''}`}
+      onClick={() => toggleSettled(mo.id, feeKey, on, demo)}
+    >
+      {on ? '已結清' : '未結清'}
+    </button>
+  )
+}
 
 export default function Dashboard() {
   const { months, loading, demo } = useMonths()
@@ -22,8 +41,12 @@ export default function Dashboard() {
         const batch = writeBatch(db)
         for (const [id, fees] of Object.entries(SEED_MONTHS)) {
           const paidBy = {}
-          for (const key of Object.keys(fees)) paidBy[key] = DEFAULT_PAID_BY[key]
-          batch.set(doc(db, COL.months, id), { fees, paid: {}, paidBy })
+          const settled = {}
+          for (const key of Object.keys(fees)) {
+            paidBy[key] = DEFAULT_PAID_BY[key]
+            settled[key] = seedSettled(id, key)
+          }
+          batch.set(doc(db, COL.months, id), { fees, paid: {}, paidBy, settled })
         }
         await batch.commit()
       } catch (e) {
@@ -44,9 +67,32 @@ export default function Dashboard() {
     )
   }
 
+  // 目前未結清總金額（所有月份中 settled=false 的費用加總）
+  let outstanding = 0
+  let outstandingCount = 0
+  for (const mo of months) {
+    for (const [key, amt] of Object.entries(mo.fees)) {
+      if (!mo.settled[key] && Number(amt) > 0) {
+        outstanding += Number(amt)
+        outstandingCount++
+      }
+    }
+  }
+
   return (
     <>
       {demo && <p className="hint demo-note">※ 展示模式（?demo）：顯示內建歷史資料，不會寫入資料庫</p>}
+
+      {/* 未結清總額 */}
+      {outstandingCount > 0 && (
+        <section className="card outstanding-card">
+          <div>
+            <p className="kicker">OUTSTANDING · 尚未收齊</p>
+            <p className="outstanding-note">共 {outstandingCount} 筆費用未分攤結清</p>
+          </div>
+          <span className="serif outstanding-amt">$ {fmt(outstanding)}</span>
+        </section>
+      )}
 
       {/* 檢視切換 */}
       <div className="tabs">
@@ -69,6 +115,7 @@ export default function Dashboard() {
         <HistoryView
           months={months}
           openMonth={(id) => { setSelected(id); setView('month') }}
+          demo={demo}
         />
       )}
     </>
@@ -106,10 +153,11 @@ function MonthView({ months, selected, setSelected, demo }) {
         </div>
         {details.length === 0 && <p className="hint">本月尚未輸入任何費用</p>}
         {details.map((d) => (
-          <div key={d.key} className="fee-row">
+          <div key={d.key} className={`fee-row${current.settled[d.key] ? ' done' : ''}`}>
             <span className="fee-label">
               {d.label}
-              <span className="payer-chip">{d.payer}先繳</span>
+              <span className="payer-chip">{d.payer}收款</span>
+              <SettledChip mo={current} feeKey={d.key} demo={demo} />
             </span>
             <span className="serif">$ {fmt(d.amount)}</span>
           </div>
@@ -157,11 +205,12 @@ function MonthView({ months, selected, setSelected, demo }) {
 }
 
 // ── 全部歷史檢視:所有月份逐筆列出，方便對帳 ─────────────────────
-function HistoryView({ months, openMonth }) {
+function HistoryView({ months, openMonth, demo }) {
   return (
     <>
       <p className="hint history-hint">
-        2025.3 起的完整紀錄，每筆含金額、先繳的人、分攤人數與每人應付。點月份可跳到單月檢視。
+        2025.3 起的完整紀錄，每筆含金額、收款人、分攤人數與每人應付；紅字＝還沒收齊。
+        點月份可跳到單月檢視、點標籤可切換結清狀態。
       </p>
       {months.map((mo) => {
         const { details } = splitMonth(mo.id, mo.fees, mo.paidBy)
@@ -173,13 +222,16 @@ function HistoryView({ months, openMonth }) {
             </button>
             {details.length === 0 && <p className="hint">（無費用）</p>}
             {details.map((d) => (
-              <div key={d.key} className="history-row">
+              <div key={d.key} className={`history-row${mo.settled[d.key] ? ' done' : ''}`}>
                 <div className="history-line1">
-                  <span className="fee-label">{d.label}</span>
+                  <span className="fee-label">
+                    {d.label}
+                    <SettledChip mo={mo} feeKey={d.key} demo={demo} />
+                  </span>
                   <span className="serif">$ {fmt(d.amount)}</span>
                 </div>
                 <div className="history-line2">
-                  <span className="payer-chip">{d.payer}先繳</span>
+                  <span className="payer-chip">{d.payer}收款</span>
                   <span>÷{d.n} 人 → 每人 <b className="serif">$ {fmt(d.each)}</b></span>
                 </div>
               </div>

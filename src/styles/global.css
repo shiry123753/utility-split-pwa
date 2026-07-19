@@ -107,6 +107,25 @@ button { font-family: var(--sans); cursor: pointer; }
   background: var(--panel2); vertical-align: 1px; text-transform: none;
 }
 
+/* ---- 每筆費用的結清標籤（可點擊切換） ---- */
+.settled-chip {
+  display: inline-block; margin-left: 6px; padding: 1px 8px;
+  border: 1px solid var(--bad); border-radius: 999px;
+  font-size: 10.5px; color: var(--bad); letter-spacing: 1px;
+  background: transparent; vertical-align: 1px;
+}
+.settled-chip.on { border-color: var(--line); color: var(--mut); background: var(--panel2); }
+.fee-row.done .fee-label, .fee-row.done .serif,
+.history-row.done .history-line1, .history-row.done .history-line2 { opacity: .5; }
+
+/* ---- 未結清總額 ---- */
+.outstanding-card {
+  display: flex; align-items: center; justify-content: space-between;
+  border-left: 3px solid var(--bad); margin-bottom: 14px; padding: 14px 16px;
+}
+.outstanding-note { font-size: 12.5px; color: var(--mut); margin-top: 2px; }
+.outstanding-amt { font-size: 26px; color: var(--bad); }
+
 /* ---- 月份選擇 ---- */
 .month-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 select, input {

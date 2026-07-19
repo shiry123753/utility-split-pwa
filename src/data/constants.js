@@ -1,12 +1,12 @@
 // ── 家庭成員與分攤規則 ──────────────────────────────────────────
 // 陳億（爸爸）為出資人：實際支付水費、電費、瓦斯費、網路費，不參與分攤。
+// 這幾項在帳上記為陳麒伊收款（等同她付的），大家分攤後匯給她。
 // 賴覺生每月自付管理費 5818 元，但這筆費用納入分攤計算（先代墊，再向其他人收回）。
 //
 // 分攤群組：
 //   base3   → 管理費、網路費：永遠由 賴覺生、陳麒伊、王子維 三人平分
 //   utility → 水費、電費、瓦斯費：2026-05 前三人平分；2026-05 起賴唯中加入四人平分
 
-export const PAYER_NAME = '陳億'
 export const MGMT_FEE = 5818
 
 export const FEES = [
@@ -17,14 +17,21 @@ export const FEES = [
   { key: 'mgmt', label: '管理費', group: 'base3' },
 ]
 
-// 每筆費用預設的先墊付者（= 這筆錢要匯給誰）。
+// 每筆費用預設的收款人（= 這筆錢要匯給誰）。
+// 水電瓦斯網路實際由陳億繳，但帳上記陳麒伊收款；管理費由賴覺生代墊。
 // Firestore 文件的 paidBy 欄位若缺漏（舊資料），一律以此為準。
 export const DEFAULT_PAID_BY = {
-  water: '陳億',
-  electricity: '陳億',
-  gas: '陳億',
-  internet: '陳億',
+  water: '陳麒伊',
+  electricity: '陳麒伊',
+  gas: '陳麒伊',
+  internet: '陳麒伊',
   mgmt: '賴覺生',
+}
+
+// 匯入歷史資料時各筆費用的結清狀態：
+// 管理費 2026-07 之前都已收齊；水電瓦斯網路全部尚未結清。
+export function seedSettled(monthId, feeKey) {
+  return feeKey === 'mgmt' && monthId < '2026-07'
 }
 
 export const MEMBERS = [

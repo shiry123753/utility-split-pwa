@@ -27,7 +27,9 @@
 
 - `utility_months/{YYYY-MM}`：
   - `fees`: `{ water, electricity, gas, internet, mgmt }` 各項金額
-  - `paidBy`: `{ 費用key: 先墊付者姓名 }`（水電瓦斯網路=陳億、管理費=賴覺生；缺漏時程式以預設值補）
+  - `paidBy`: `{ 費用key: 收款人姓名 }`（水電瓦斯網路=陳麒伊〔陳億實繳，帳記她名下〕、
+    管理費=賴覺生；缺漏時程式以預設值補）
+  - `settled`: `{ 費用key: true/false }` 該筆費用是否已跟大家收齊（點頁面上的標籤可切換）
   - `paid`: `{ jue, chi, tzu, wei }` 各成員該月是否結清
 
 Firestore 規則需要開放 `utility_months`（比照 `money_*` 的做法）：
